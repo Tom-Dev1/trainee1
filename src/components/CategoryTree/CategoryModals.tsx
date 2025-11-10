@@ -29,7 +29,7 @@ export const CategoryModals: React.FC<CategoryModalsProps> = ({ type, category, 
         const flatten = (cats: Category[]): Category[] => {
             const result: Category[] = [];
             cats.forEach(cat => {
-                const { children, ...flatCat } = cat;
+                const { children, ...flatCat } = cat as any;
                 result.push(flatCat);
                 if (children) {
                     result.push(...flatten(children));

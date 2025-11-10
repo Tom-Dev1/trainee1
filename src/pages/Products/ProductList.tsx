@@ -6,12 +6,9 @@ import {
     Space,
     Typography,
     Tag,
-    Image,
     Modal,
-    Form,
-    InputNumber,
-    Select,
     message,
+    Select,
 } from 'antd';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
@@ -19,9 +16,11 @@ import { useNavigate } from 'react-router-dom';
 import type { Product } from '../../types';
 import { productsApi, categoriesApi } from '../../services/api';
 import { productsStorage } from '../../services/localStorage';
+import { ProductForm } from '../../components/ProductForm';
+import { useProducts } from '../../hooks/useProducts';
+import { SafeImage } from '../../components/SafeImage';
 
 const { Title } = Typography;
-const { Option } = Select;
 
 export const ProductList: React.FC = () => {
     const navigate = useNavigate();
@@ -29,9 +28,6 @@ export const ProductList: React.FC = () => {
     const [searchText, setSearchText] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
-    const [isModalVisible, setIsModalVisible] = useState(false);
-    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-    const [form] = Form.useForm();
 
     const { data: productsData, isLoading } = useQuery({
         queryKey: ['products', pagination.current, pagination.pageSize, searchText, selectedCategory],
@@ -49,6 +45,10 @@ export const ProductList: React.FC = () => {
         queryFn: categoriesApi.getCategories,
     });
 
+    // Get all products for ProductForm (without pagination)
+    const { data: allProductsData } = useProducts();
+    const allProducts = allProductsData?.data || [];
+
     const handleSearch = (value: string) => {
         setSearchText(value);
         setPagination({ ...pagination, current: 1 });
@@ -59,23 +59,19 @@ export const ProductList: React.FC = () => {
         setPagination({ ...pagination, current: 1 });
     };
 
-    const handleTableChange = (paginationConfig: any) => {
+    const handleTableChange = (paginationConfig: { current?: number; pageSize?: number }) => {
         setPagination({
-            current: paginationConfig.current,
-            pageSize: paginationConfig.pageSize,
+            current: paginationConfig.current || 1,
+            pageSize: paginationConfig.pageSize || 10,
         });
     };
 
     const handleAdd = () => {
-        setEditingProduct(null);
-        form.resetFields();
-        setIsModalVisible(true);
+        navigate('/products?action=add');
     };
 
     const handleEdit = (product: Product) => {
-        setEditingProduct(product);
-        form.setFieldsValue(product);
-        setIsModalVisible(true);
+        navigate(`/products?action=edit&productId=${product.id}`);
     };
 
     const handleDelete = (product: Product) => {
@@ -94,41 +90,28 @@ export const ProductList: React.FC = () => {
         });
     };
 
-    const handleSubmit = async (values: any) => {
-        try {
-            if (editingProduct) {
-                const updated = productsStorage.updateProduct(editingProduct.id, values);
-                if (updated) {
-                    message.success('Product updated successfully');
-                } else {
-                    message.error('Failed to update product');
-                }
-            } else {
-                productsStorage.addProduct(values);
-                message.success('Product created successfully');
-            }
-
-            setIsModalVisible(false);
-            queryClient.invalidateQueries({ queryKey: ['products'] });
-        } catch (error) {
-            message.error('An error occurred');
-        }
-    };
-
     const columns = [
         {
             title: 'Image',
             dataIndex: 'imageUrl',
             key: 'imageUrl',
             width: 80,
-            render: (imageUrl: string) => (
-                <Image
-                    width={50}
-                    height={50}
-                    src={imageUrl}
-                    style={{ objectFit: 'cover', borderRadius: 4 }}
-                />
-            ),
+            render: (imageUrl: string | string[]) => {
+                const images = Array.isArray(imageUrl) ? imageUrl : [imageUrl];
+                const firstImage = images[0];
+                if (!firstImage) return null;
+                return (
+                    <SafeImage
+                        width={50}
+                        height={50}
+                        src={firstImage}
+                        style={{ objectFit: 'cover', borderRadius: 4 }}
+                        preview={images.length > 1 ? {
+                            mask: `+${images.length - 1}`,
+                        } : true}
+                    />
+                );
+            },
         },
         {
             title: 'Name',
@@ -170,12 +153,12 @@ export const ProductList: React.FC = () => {
                 { text: 'Active', value: 'active' },
                 { text: 'Inactive', value: 'inactive' },
             ],
-            onFilter: (value: any, record: Product) => record.status === value,
+            onFilter: (value: boolean | React.Key, record: Product) => record.status === value,
         },
         {
             title: 'Actions',
             key: 'actions',
-            render: (_: any, record: Product) => (
+            render: (_: unknown, record: Product) => (
                 <Space>
                     <Button
                         type="primary"
@@ -216,13 +199,11 @@ export const ProductList: React.FC = () => {
                     allowClear
                     style={{ width: 200 }}
                     onChange={handleCategoryFilter}
-                >
-                    {categories?.map(category => (
-                        <Option key={category.id} value={category.id}>
-                            {category.name}
-                        </Option>
-                    ))}
-                </Select>
+                    options={categories?.map(category => ({
+                        label: category.name,
+                        value: category.id,
+                    }))}
+                />
             </Space>
 
             <Table
@@ -241,101 +222,8 @@ export const ProductList: React.FC = () => {
                 onChange={handleTableChange}
             />
 
-            <Modal
-                title={editingProduct ? 'Edit Product' : 'Add Product'}
-                open={isModalVisible}
-                onCancel={() => setIsModalVisible(false)}
-                footer={null}
-                width={600}
-            >
-                <Form
-                    form={form}
-                    layout="vertical"
-                    onFinish={handleSubmit}
-                >
-                    <Form.Item
-                        name="name"
-                        label="Product Name"
-                        rules={[{ required: true, message: 'Please enter product name' }]}
-                    >
-                        <Input />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="description"
-                        label="Description"
-                        rules={[{ required: true, message: 'Please enter description' }]}
-                    >
-                        <Input.TextArea rows={3} />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="price"
-                        label="Price"
-                        rules={[{ required: true, message: 'Please enter price' }]}
-                    >
-                        <InputNumber
-                            min={0}
-                            step={0.01}
-                            style={{ width: '100%' }}
-                            formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                            parser={value => value!.replace(/\$\s?|(,*)/g, '') as any}
-                        />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="categoryId"
-                        label="Category"
-                        rules={[{ required: true, message: 'Please select category' }]}
-                    >
-                        <Select>
-                            {categories?.map(category => (
-                                <Option key={category.id} value={category.id}>
-                                    {category.name}
-                                </Option>
-                            ))}
-                        </Select>
-                    </Form.Item>
-
-                    <Form.Item
-                        name="stock"
-                        label="Stock"
-                        rules={[{ required: true, message: 'Please enter stock quantity' }]}
-                    >
-                        <InputNumber min={0} style={{ width: '100%' }} />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="imageUrl"
-                        label="Image URL"
-                        rules={[{ required: true, message: 'Please enter image URL' }]}
-                    >
-                        <Input />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="status"
-                        label="Status"
-                        rules={[{ required: true, message: 'Please select status' }]}
-                    >
-                        <Select>
-                            <Option value="active">Active</Option>
-                            <Option value="inactive">Inactive</Option>
-                        </Select>
-                    </Form.Item>
-
-                    <Form.Item>
-                        <Space>
-                            <Button type="primary" htmlType="submit">
-                                {editingProduct ? 'Update' : 'Create'}
-                            </Button>
-                            <Button onClick={() => setIsModalVisible(false)}>
-                                Cancel
-                            </Button>
-                        </Space>
-                    </Form.Item>
-                </Form>
-            </Modal>
+            {/* ProductForm handles URL params and localStorage automatically */}
+            <ProductForm products={allProducts} />
         </div>
     );
 };

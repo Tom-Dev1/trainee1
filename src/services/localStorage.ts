@@ -150,7 +150,7 @@ const flattenCategories = (categories: Category[]): Category[] => {
 
     const flatten = (cats: Category[]) => {
         cats.forEach(cat => {
-            const { children, ...flatCat } = cat;
+            const { children, ...flatCat } = cat as any;
             result.push(flatCat);
             if (children) {
                 flatten(children);
@@ -162,9 +162,9 @@ const flattenCategories = (categories: Category[]): Category[] => {
     return result;
 };
 
-const buildCategoryTree = (categories: Category[]): Category[] => {
-    const categoryMap = new Map<string, Category>();
-    const rootCategories: Category[] = [];
+const buildCategoryTree = (categories: Category[]): any[] => {
+    const categoryMap = new Map<string, any>();
+    const rootCategories: any[] = [];
 
     // Create a map of all categories
     categories.forEach(cat => {

@@ -1,18 +1,9 @@
-import React, { useState } from 'react';
-import { Layout, Menu, Divider, Typography, Button, Space } from 'antd';
-import { useNavigate, useLocation } from 'react-router-dom';
-import {
-    DashboardOutlined,
-    ShoppingOutlined,
-    ShoppingCartOutlined,
-    PlusOutlined,
-    DownOutlined,
-    RightOutlined,
-} from '@ant-design/icons';
-import { CategoryTree } from '../CategoryTree';
-import { useCategories } from '../../hooks/useCategories';
-
-const { Text } = Typography;
+import React, { useState, useEffect } from 'react';
+import { Layout } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { NavigationMenu } from '../NavigationMenu';
+import { fetchCategories } from '../../data/mockCategories';
+import type { Category } from '../../types';
 
 const { Sider } = Layout;
 
@@ -22,31 +13,69 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
     const navigate = useNavigate();
-    const location = useLocation();
-    const [categoriesExpanded, setCategoriesExpanded] = useState(true);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const { data: categories, isLoading: categoriesLoading } = useCategories();
+    useEffect(() => {
+        const loadCategories = async () => {
+            try {
+                setLoading(true);
+                const data = await fetchCategories();
+                setCategories(data);
+            } catch (error) {
+                console.error('Failed to fetch categories:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const menuItems = [
-        {
-            key: '/dashboard',
-            icon: <DashboardOutlined />,
-            label: 'Dashboard',
-        },
-        {
-            key: '/products',
-            icon: <ShoppingOutlined />,
-            label: 'Products',
-        },
-        {
-            key: '/orders',
-            icon: <ShoppingCartOutlined />,
-            label: 'Orders',
-        },
-    ];
+        loadCategories();
+    }, []);
 
-    const handleMenuClick = ({ key }: { key: string }) => {
-        navigate(key);
+    const handleCategoryAction = (
+        action: 'view' | 'add' | 'update' | 'delete',
+        category: Category
+    ) => {
+        switch (action) {
+            case 'view':
+                // Navigate directly to category detail page
+                navigate(`/categories/${category.slug}`);
+                break;
+            case 'add':
+                navigate(`/category?action=add&parentId=${category.id}`);
+                break;
+            case 'update':
+                navigate(`/category?action=edit&categoryId=${category.id}`);
+                break;
+            case 'delete':
+                // Handle delete (could show modal)
+                console.log('Delete category:', category.id);
+                break;
+        }
+    };
+
+    const handleStaticAction = (action: string, path: string) => {
+        switch (action) {
+            case 'view':
+                navigate(path);
+                break;
+            case 'add':
+                if (path === '/products') {
+                    navigate('/products?action=add');
+                } else if (path === '/category') {
+                    navigate('/category?action=add');
+                }
+                break;
+            case 'edit':
+                if (path === '/profile') {
+                    navigate('/profile?action=edit');
+                }
+                break;
+            case 'refresh':
+                // Refresh current page
+                window.location.reload();
+                break;
+        }
     };
 
     return (
@@ -73,61 +102,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed }) => {
                 }}
             />
 
-            <Menu
-                theme="dark"
-                mode="inline"
-                selectedKeys={[location.pathname.startsWith('/categories') ? '' : location.pathname]}
-                items={menuItems}
-                onClick={handleMenuClick}
+            <NavigationMenu
+                categories={categories}
+                loading={loading}
+                onCategoryAction={handleCategoryAction}
+                onStaticAction={handleStaticAction}
             />
-
-            {!collapsed && (
-                <>
-                    <Divider style={{ borderColor: '#434343', margin: '8px 0' }} />
-
-                    <div style={{ padding: '0 16px' }}>
-                        <Space
-                            style={{
-                                width: '100%',
-                                justifyContent: 'space-between',
-                                marginBottom: 8,
-                                cursor: 'pointer'
-                            }}
-                            onClick={() => setCategoriesExpanded(!categoriesExpanded)}
-                        >
-                            <Space>
-                                {categoriesExpanded ? <DownOutlined /> : <RightOutlined />}
-                                <Text style={{ color: 'rgba(255, 255, 255, 0.85)' }}>
-                                    Categories
-                                </Text>
-                            </Space>
-                            <Button
-                                type="text"
-                                size="small"
-                                icon={<PlusOutlined />}
-                                style={{ color: 'rgba(255, 255, 255, 0.65)' }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate('/categories?action=add');
-                                }}
-                            />
-                        </Space>
-
-                        {categoriesExpanded && (
-                            <div style={{
-                                maxHeight: 'calc(100vh - 300px)',
-                                overflowY: 'auto',
-                                paddingRight: 8
-                            }}>
-                                <CategoryTree
-                                    categories={categories || []}
-                                    loading={categoriesLoading}
-                                />
-                            </div>
-                        )}
-                    </div>
-                </>
-            )}
         </Sider>
     );
 };

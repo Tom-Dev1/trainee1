@@ -2,6 +2,7 @@ import React from 'react';
 import { Layout, Button, Typography, Space } from 'antd';
 import { MoonOutlined, SunOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
 import { useTheme } from '../../contexts/ThemeContext';
+import { GlobalSearchBar } from '../GlobalSearch/GlobalSearchBar';
 
 const { Header: AntHeader } = Layout;
 const { Title } = Typography;
@@ -40,6 +41,14 @@ export const Header: React.FC<HeaderProps> = ({ collapsed, onToggle }) => {
                     E-commerce CMS
                 </Title>
             </Space>
+
+            {/* Global Search Bar */}
+            <div style={{ flex: 1, maxWidth: 500, margin: '0 24px' }}>
+                <GlobalSearchBar
+                    size="middle"
+                    style={{ width: '100%' }}
+                />
+            </div>
 
             <Button
                 type="text"

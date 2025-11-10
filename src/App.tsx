@@ -8,6 +8,9 @@ import { ProductDetail } from './pages/Products/ProductDetail';
 import { CategoryList } from './pages/Categories/CategoryList';
 import { CategoryDetail } from './pages/Categories/CategoryDetail';
 import { OrderList } from './pages/Orders/OrderList';
+import { ProfileList } from './pages/Profiles/ProfileList';
+import { SearchResults } from './pages/Search/SearchResults';
+import { SearchAnalytics } from './pages/Search/SearchAnalytics';
 import './App.css';
 
 const queryClient = new QueryClient({
@@ -30,9 +33,14 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="products" element={<ProductList />} />
               <Route path="products/:slug" element={<ProductDetail />} />
+              <Route path="orders" element={<OrderList />} />
+              <Route path="category" element={<CategoryList />} />
               <Route path="categories" element={<CategoryList />} />
               <Route path="categories/:slug" element={<CategoryDetail />} />
-              <Route path="orders" element={<OrderList />} />
+              <Route path="profile" element={<ProfileList />} />
+              <Route path="profiles" element={<ProfileList />} />
+              <Route path="search" element={<SearchResults />} />
+              <Route path="search/analytics" element={<SearchAnalytics />} />
             </Route>
           </Routes>
         </Router>

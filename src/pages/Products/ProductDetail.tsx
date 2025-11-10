@@ -1,9 +1,10 @@
 import React from 'react';
-import { Card, Typography, Image, Tag, Descriptions, Button, Space, Spin } from 'antd';
+import { Card, Typography, Tag, Descriptions, Button, Space, Spin } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeftOutlined, EditOutlined } from '@ant-design/icons';
 import { productsApi } from '../../services/api';
+import { SafeImage } from '../../components/SafeImage';
 
 const { Title, Paragraph } = Typography;
 
@@ -53,12 +54,21 @@ export const ProductDetail: React.FC = () => {
             <Card>
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                     <div style={{ flex: '0 0 300px' }}>
-                        <Image
-                            width="100%"
-                            height={300}
-                            src={product.imageUrl}
-                            style={{ objectFit: 'cover', borderRadius: 8 }}
-                        />
+                        {(() => {
+                            const images = Array.isArray(product.imageUrl) ? product.imageUrl : [product.imageUrl];
+                            const firstImage = images[0];
+                            return firstImage ? (
+                                <SafeImage
+                                    width="100%"
+                                    height={300}
+                                    src={firstImage}
+                                    style={{ objectFit: 'cover', borderRadius: 8 }}
+                                    preview={images.length > 1 ? {
+                                        mask: `+${images.length - 1}`,
+                                    } : true}
+                                />
+                            ) : null;
+                        })()}
                     </div>
 
                     <div style={{ flex: 1, minWidth: 300 }}>

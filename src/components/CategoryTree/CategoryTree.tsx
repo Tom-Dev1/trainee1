@@ -10,9 +10,10 @@ import { CategoryModals } from './CategoryModals';
 interface CategoryTreeProps {
     categories: Category[];
     loading?: boolean;
+    onContextMenu?: (e: React.MouseEvent, category: Category) => void;
 }
 
-export const CategoryTree: React.FC<CategoryTreeProps> = ({ categories, loading }) => {
+export const CategoryTree: React.FC<CategoryTreeProps> = ({ categories, loading, onContextMenu }) => {
     const navigate = useNavigate();
     const { slug } = useParams();
     const [contextMenuVisible, setContextMenuVisible] = useState(false);
@@ -87,7 +88,7 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({ categories, loading 
                             alignItems: 'center',
                             width: '100%'
                         }}
-                        onContextMenu={(e) => handleContextMenu(e, category)}
+                        onContextMenu={(e) => onContextMenu ? onContextMenu(e, category) : handleContextMenu(e, category)}
                     >
                         <span
                             style={{
@@ -118,7 +119,7 @@ export const CategoryTree: React.FC<CategoryTreeProps> = ({ categories, loading 
                     </div>
                 ),
                 category,
-                children: category.children ? buildTreeNodes(category.children) : undefined,
+                children: (category as any).children ? buildTreeNodes((category as any).children) : undefined,
             }));
         };
 

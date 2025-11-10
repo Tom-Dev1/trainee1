@@ -1,15 +1,70 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { message } from 'antd';
 import type { Category, CategoryFormData } from '../types';
-import { categoriesApi } from '../services/api';
-import { categoriesStorage } from '../services/localStorage';
+
+// API functions
+const categoriesApi = {
+    getCategories: async (): Promise<Category[]> => {
+        const response = await fetch('/api/categories');
+        if (!response.ok) throw new Error('Failed to fetch categories');
+        return response.json();
+    },
+
+    getCategoriesTree: async (): Promise<Category[]> => {
+        const response = await fetch('/api/categories/tree');
+        if (!response.ok) throw new Error('Failed to fetch categories tree');
+        return response.json();
+    },
+
+    getCategory: async (slug: string): Promise<Category> => {
+        const response = await fetch(`/api/categories/${slug}`);
+        if (!response.ok) throw new Error('Failed to fetch category');
+        return response.json();
+    },
+
+    createCategory: async (data: CategoryFormData): Promise<Category> => {
+        const response = await fetch('/api/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error('Failed to create category');
+        return response.json();
+    },
+
+    updateCategory: async (id: string, data: Partial<CategoryFormData>): Promise<Category> => {
+        const response = await fetch(`/api/categories/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error('Failed to update category');
+        return response.json();
+    },
+
+    deleteCategory: async (id: string): Promise<{ success: boolean }> => {
+        const response = await fetch(`/api/categories/${id}`, {
+            method: 'DELETE',
+        });
+        if (!response.ok) throw new Error('Failed to delete category');
+        return response.json();
+    },
+};
 
 // Query hooks
 export const useCategories = () => {
     return useQuery({
-        queryKey: ['categories', 'tree'],
+        queryKey: ['categories'],
         queryFn: categoriesApi.getCategories,
         staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+};
+
+export const useCategoriesTree = () => {
+    return useQuery({
+        queryKey: ['categories', 'tree'],
+        queryFn: categoriesApi.getCategoriesTree,
+        staleTime: 5 * 60 * 1000,
     });
 };
 
@@ -27,30 +82,11 @@ export const useCreateCategory = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (data: CategoryFormData) => {
-            try {
-                // Try MSW first
-                const response = await fetch('/api/categories', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data),
-                });
-
-                if (!response.ok) throw new Error('MSW not available');
-                return response.json();
-            } catch {
-                // Fallback to localStorage
-                return categoriesStorage.addCategory(data);
-            }
-        },
+        mutationFn: categoriesApi.createCategory,
         onMutate: async (newCategory) => {
-            // Cancel outgoing refetches
             await queryClient.cancelQueries({ queryKey: ['categories'] });
+            const previousCategories = queryClient.getQueryData(['categories']);
 
-            // Snapshot previous value
-            const previousCategories = queryClient.getQueryData(['categories', 'tree']);
-
-            // Optimistically update
             const tempCategory: Category = {
                 id: `temp-${Date.now()}`,
                 name: newCategory.name,
@@ -60,16 +96,15 @@ export const useCreateCategory = () => {
                 updated_at: new Date().toISOString(),
             };
 
-            queryClient.setQueryData(['categories', 'tree'], (old: Category[] = []) => {
+            queryClient.setQueryData(['categories'], (old: Category[] = []) => {
                 return [...old, tempCategory];
             });
 
             return { previousCategories };
         },
         onError: (_, __, context) => {
-            // Rollback on error
             if (context?.previousCategories) {
-                queryClient.setQueryData(['categories', 'tree'], context.previousCategories);
+                queryClient.setQueryData(['categories'], context.previousCategories);
             }
             message.error('Failed to create category');
         },
@@ -77,7 +112,6 @@ export const useCreateCategory = () => {
             message.success('Category created successfully');
         },
         onSettled: () => {
-            // Refetch to get the real data
             queryClient.invalidateQueries({ queryKey: ['categories'] });
         },
     });
@@ -87,29 +121,13 @@ export const useUpdateCategory = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, data }: { id: string; data: Partial<CategoryFormData> }) => {
-            try {
-                // Try MSW first
-                const response = await fetch(`/api/categories/${id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data),
-                });
-
-                if (!response.ok) throw new Error('MSW not available');
-                return response.json();
-            } catch {
-                // Fallback to localStorage
-                return categoriesStorage.updateCategory(id, data);
-            }
-        },
+        mutationFn: ({ id, data }: { id: string; data: Partial<CategoryFormData> }) =>
+            categoriesApi.updateCategory(id, data),
         onMutate: async ({ id, data }) => {
             await queryClient.cancelQueries({ queryKey: ['categories'] });
+            const previousCategories = queryClient.getQueryData(['categories']);
 
-            const previousCategories = queryClient.getQueryData(['categories', 'tree']);
-
-            // Optimistically update
-            queryClient.setQueryData(['categories', 'tree'], (old: Category[] = []) => {
+            queryClient.setQueryData(['categories'], (old: Category[] = []) => {
                 return old.map(cat =>
                     cat.id === id
                         ? { ...cat, ...data, updated_at: new Date().toISOString() }
@@ -121,7 +139,7 @@ export const useUpdateCategory = () => {
         },
         onError: (_, __, context) => {
             if (context?.previousCategories) {
-                queryClient.setQueryData(['categories', 'tree'], context.previousCategories);
+                queryClient.setQueryData(['categories'], context.previousCategories);
             }
             message.error('Failed to update category');
         },
@@ -138,46 +156,20 @@ export const useDeleteCategory = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (id: string) => {
-            try {
-                // Try MSW first
-                const response = await fetch(`/api/categories/${id}`, {
-                    method: 'DELETE',
-                });
-
-                if (!response.ok) throw new Error('MSW not available');
-                return { success: true };
-            } catch {
-                // Fallback to localStorage
-                const success = categoriesStorage.deleteCategory(id);
-                if (!success) throw new Error('Failed to delete category');
-                return { success };
-            }
-        },
+        mutationFn: categoriesApi.deleteCategory,
         onMutate: async (deletedId) => {
             await queryClient.cancelQueries({ queryKey: ['categories'] });
+            const previousCategories = queryClient.getQueryData(['categories']);
 
-            const previousCategories = queryClient.getQueryData(['categories', 'tree']);
-
-            // Optimistically update
-            queryClient.setQueryData(['categories', 'tree'], (old: Category[] = []) => {
-                const removeCategory = (categories: Category[]): Category[] => {
-                    return categories.filter(cat => {
-                        if (cat.id === deletedId) return false;
-                        if (cat.children) {
-                            cat.children = removeCategory(cat.children);
-                        }
-                        return true;
-                    });
-                };
-                return removeCategory(old);
+            queryClient.setQueryData(['categories'], (old: Category[] = []) => {
+                return old.filter(cat => cat.id !== deletedId);
             });
 
             return { previousCategories };
         },
         onError: (_, __, context) => {
             if (context?.previousCategories) {
-                queryClient.setQueryData(['categories', 'tree'], context.previousCategories);
+                queryClient.setQueryData(['categories'], context.previousCategories);
             }
             message.error('Failed to delete category');
         },

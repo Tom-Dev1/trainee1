@@ -13,6 +13,10 @@ interface TreeNode {
     children?: TreeNode[];
 }
 
+interface CategoryWithChildren extends Category {
+    children?: CategoryWithChildren[];
+}
+
 export const CategoryDetail: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
     const navigate = useNavigate();
@@ -24,8 +28,9 @@ export const CategoryDetail: React.FC = () => {
     const buildBreadcrumb = () => {
         if (!category || !allCategories) return [];
 
-        const flatCategories = allCategories.flatMap(function flatten(cat): Category[] {
-            const { children, ...flatCat } = cat;
+        const flatCategories = allCategories.flatMap(function flatten(cat: Category | CategoryWithChildren): Category[] {
+            const categoryWithChildren = cat as CategoryWithChildren;
+            const { children, ...flatCat } = categoryWithChildren;
             return [flatCat, ...(children ? children.flatMap(flatten) : [])];
         });
 
@@ -45,7 +50,7 @@ export const CategoryDetail: React.FC = () => {
 
     const breadcrumbPath = buildBreadcrumb();
 
-    const buildTreeData = (categories: Category[]): TreeNode[] => {
+    const buildTreeData = (categories: CategoryWithChildren[]): TreeNode[] => {
         return categories.map(cat => ({
             title: cat.name,
             key: cat.id,
@@ -114,16 +119,19 @@ export const CategoryDetail: React.FC = () => {
                     </Descriptions.Item>
                 </Descriptions>
 
-                {category.children && category.children.length > 0 && (
-                    <div>
-                        <Title level={4}>Subcategories</Title>
-                        <Tree
-                            treeData={buildTreeData(category.children)}
-                            defaultExpandAll
-                            showLine
-                        />
-                    </div>
-                )}
+                {(() => {
+                    const categoryWithChildren = category as CategoryWithChildren;
+                    return categoryWithChildren.children && categoryWithChildren.children.length > 0 ? (
+                        <div>
+                            <Title level={4}>Subcategories</Title>
+                            <Tree
+                                treeData={buildTreeData(categoryWithChildren.children)}
+                                defaultExpandAll
+                                showLine
+                            />
+                        </div>
+                    ) : null;
+                })()}
             </Card>
         </div>
     );
